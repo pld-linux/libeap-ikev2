@@ -23,13 +23,13 @@ It supports authentication techniques that are based on asymmetric key
 pairs, symmetric keys and passwords.
 
 %description -l pl.UTF-8
-EAP-IKEv2 jest protokĹem uwierzytelnienia pozwalającym na bezpieczne
+EAP-IKEv2 jest protołem uwierzytelnienia pozwalającym na bezpieczne
 uwierzytelnienie i wymianę kluczy sesji pomiędzy serwerem i klientem
 EAP. Metoda ta bazuje na kluczach kryptograficznych i hasłach.
 
 %package devel
 Summary:	Header files for libeap-ikev2 library
-Summary(pl.UTF-8):	Pliki nagĹĂłwkowe bibliote libeap-ikev2
+Summary(pl.UTF-8):	Pliki nagłówkowe biblioteki libeap-ikev2
 Group:		Development/Libraries
 Requires:	%{name} = %{version}-%{release}
 
@@ -37,7 +37,7 @@ Requires:	%{name} = %{version}-%{release}
 Header files for libeap-ikev2 library.
 
 %description devel -l pl.UTF-8
-Pliki nagĹĂłwkowe bibliote libeap-ikev2.
+Pliki nagłówkowe biblioteki libeap-ikev2.
 
 %package static
 Summary:	Static libeap-ikev2 library
