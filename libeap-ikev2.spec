@@ -23,7 +23,7 @@ It supports authentication techniques that are based on asymmetric key
 pairs, symmetric keys and passwords.
 
 %description -l pl.UTF-8
-EAP-IKEv2 jest protołem uwierzytelnienia pozwalającym na bezpieczne
+EAP-IKEv2 jest protokołem uwierzytelnienia pozwalającym na bezpieczne
 uwierzytelnienie i wymianę kluczy sesji pomiędzy serwerem i klientem
 EAP. Metoda ta bazuje na kluczach kryptograficznych i hasłach.
 
