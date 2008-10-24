@@ -4,7 +4,7 @@ Summary(pl.UTF-8):	Implementacja metody uwierzytelnienia EAP-IKEv2
 Name:		libeap-ikev2
 Version:	0.2.1
 Release:	1
-License:	GPLv2
+License:	GPL v2
 Group:		Libraries
 Source0:	http://dl.sourceforge.net/eap-ikev2/%{name}-%{version}.tar.gz
 # Source0-md5:	e8c4900ff9f2825e189be66c61d146f2
@@ -77,11 +77,11 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(644,root,root,755)
-%doc ChangeLog README
 %attr(755,root,root) %{_libdir}/libeap-ikev2.so.*
 
 %files devel
 %defattr(644,root,root,755)
+%doc ChangeLog README
 %attr(755,root,root) %{_libdir}/libeap-ikev2.so
 %{_libdir}/libeap-ikev2.la
 %{_includedir}/EAPIKEv2
