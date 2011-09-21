@@ -1,0 +1,11 @@
+--- libeap-ikev2-0.2.1/src/Makefile.am.orig	2010-11-03 23:19:13.663306058 +0100
++++ libeap-ikev2-0.2.1/src/Makefile.am	2010-11-03 23:26:27.150298526 +0100
+@@ -44,6 +44,8 @@ libeap_ikev2_la_SOURCES= auth.c \
+ 			 utils.c \
+ 			 tiger.c
+ 
++libeap_ikev2_la_LIBADD = -lssl -lcrypto -ldl
++
+ 
+ 
+ MAINTAINERCLEANFILES=Makefile.in

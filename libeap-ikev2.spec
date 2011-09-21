@@ -8,6 +8,7 @@ License:	GPL v2
 Group:		Libraries
 Source0:	http://dl.sourceforge.net/eap-ikev2/%{name}-%{version}.tar.gz
 # Source0-md5:	e8c4900ff9f2825e189be66c61d146f2
+Patch0:		link.patch
 URL:		http://eap-ikev2.sourceforge.net/
 BuildRequires:	autoconf
 BuildRequires:	automake
@@ -53,6 +54,7 @@ Statyczna biblioteka libeap-ikev2.
 
 %prep
 %setup -q
+%patch0 -p1
 
 %build
 %{__libtoolize}
