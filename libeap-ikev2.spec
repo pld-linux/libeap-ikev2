@@ -2,7 +2,7 @@ Summary:	Implementation of the EAP-IKEv2 authentication method
 Summary(pl.UTF-8):	Implementacja metody uwierzytelnienia EAP-IKEv2
 Name:		libeap-ikev2
 Version:	0.2.1
-Release:	3
+Release:	4
 License:	GPL v2+
 Group:		Libraries
 Source0:	http://downloads.sourceforge.net/eap-ikev2/%{name}-%{version}.tar.gz
