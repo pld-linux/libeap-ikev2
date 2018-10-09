@@ -1,0 +1,13 @@
+diff -dur libeap-ikev2-0.2.1.orig/src/common.h libeap-ikev2-0.2.1/src/common.h
+--- libeap-ikev2-0.2.1.orig/src/common.h	2006-09-16 01:26:08.000000000 +0200
++++ libeap-ikev2-0.2.1/src/common.h	2018-10-09 15:27:48.000000000 +0200
+@@ -61,7 +61,9 @@
+ 
+ #define EAP_IKEv2_KEY_LEN 256
+ 
++#ifndef __bool_true_false_are_defined 
+ typedef enum { false = 0, true = -1 } bool;
++#endif
+ 
+ #include <openssl/bn.h>
+ 
