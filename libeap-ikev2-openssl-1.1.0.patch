@@ -1,0 +1,284 @@
+diff -bur libeap-ikev2-0.2.1.orig/src/auth.c libeap-ikev2-0.2.1/src/auth.c
+--- libeap-ikev2-0.2.1.orig/src/auth.c	2006-09-16 01:26:08.000000000 +0200
++++ libeap-ikev2-0.2.1/src/auth.c	2018-10-24 14:41:28.829486782 +0200
+@@ -553,19 +553,24 @@
+     int i;
+     uint32_t cert_num=0;
+     uint32_t current_cert=0;
++    STACK_OF(X509_OBJECT) *objs;
+     X509_OBJECT *xobj;
++    X509 *cert;
++    EVP_PKEY *public_key;
+     uint8_t *dest;
+     uint8_t *pkdata;
+     uint32_t pklen;
+-    if(!x509_store->objs) {
++
++    objs = X509_STORE_get0_objects(x509_store);
++    if(!objs) {
+ 	xlogf(I2L_ERR,"EAP-IKEv2: Not enough data to generate hash\n");
+ 	*result=NULL;
+ 	return 0;
+     }
+     // count certifiactes
+-    for(i=0;i<sk_num(x509_store->objs);i++) {
+-	xobj=(X509_OBJECT*)sk_value(x509_store->objs,i);
+-	if(xobj && xobj->type==X509_LU_X509) {
++    for(i=0;i<sk_X509_OBJECT_num(objs);i++) {
++	xobj = sk_X509_OBJECT_value(objs, i);
++	if(xobj && X509_OBJECT_get_type(xobj)==X509_LU_X509) {
+ 	    cert_num++;
+ 	}
+     }
+@@ -577,12 +582,13 @@
+     *result=dest;
+     
+     // for each certificate compute sha1(pubkey) and add to result
+-    for(i=0;i<sk_num(x509_store->objs);i++) {
+-	xobj=(X509_OBJECT*)sk_value(x509_store->objs,i);
+-	if(xobj!=NULL && xobj->type==X509_LU_X509) {
+-	    X509 *x509=xobj->data.x509;
+-	    pkdata=X509_get_X509_PUBKEY(x509)->public_key->data;
+-	    pklen=X509_get_X509_PUBKEY(x509)->public_key->length;
++    for(i=0;i<sk_X509_OBJECT_num(objs);i++) {
++	xobj = sk_X509_OBJECT_value(objs, i);
++	if(xobj && X509_OBJECT_get_type(xobj)==X509_LU_X509) {
++	    cert = X509_OBJECT_get0_X509(xobj);
++	    // XXX: not sure about this part
++	    public_key = X509_PUBKEY_get( X509_get_X509_PUBKEY(cert));
++	    X509_PUBKEY_get0_param(NULL, &pkdata, &pklen, NULL, public_key);
+ 	    SHA1(pkdata,pklen,dest+current_cert*SHA_DIGEST_LENGTH);
+ 	    current_cert++;
+ 	}
+@@ -610,20 +616,20 @@
+     uint8_t *buf;
+     int err;
+     SHA1(data,dlen,md);
+-    switch(EVP_PKEY_type(pkey->type)) {
++    switch(EVP_PKEY_base_id(pkey)) {
+ 	case EVP_PKEY_RSA:
+-	    if(!(buf=(uint8_t*)malloc(RSA_size(pkey->pkey.rsa )))) {
++	    if(!(buf=(uint8_t*)malloc(RSA_size( EVP_PKEY_get0_RSA(pkey) )))) {
+ 		xlogf( I2L_ERR, "EAP-IKEv2: Can't alloc mem for buffer.\n" );
+ 		return 0;
+ 	    }
+-	    err = RSA_sign( NID_sha1, md, SHA_DIGEST_LENGTH, buf, &len, pkey->pkey.rsa );
++	    err = RSA_sign( NID_sha1, md, SHA_DIGEST_LENGTH, buf, &len, EVP_PKEY_get0_RSA(pkey) );
+ 	    break;
+ 	case EVP_PKEY_DSA:
+-	    if(!(buf=(uint8_t*)malloc(DSA_size(pkey->pkey.dsa)))) {
++	    if(!(buf=(uint8_t*)malloc(DSA_size( EVP_PKEY_get0_DSA(pkey) )))) {
+ 		xlogf( I2L_ERR, "EAP-IKEv2: Can't alloc mem for buffer.\n" );
+ 		return 0;
+ 	    }
+-	    err = DSA_sign( NID_sha1, md, SHA_DIGEST_LENGTH, buf, &len, pkey->pkey.dsa);
++	    err = DSA_sign( NID_sha1, md, SHA_DIGEST_LENGTH, buf, &len, EVP_PKEY_get0_DSA(pkey));
+ 	    break;
+ 	default:
+ 	    xlogf(I2L_ERR,"EAP-IKEv2: Unsupported key type");
+@@ -649,7 +655,7 @@
+  */
+ int GetCertAuthMethod(EVP_PKEY *pkey) 
+ {
+-    switch(EVP_PKEY_type(pkey->type)) {
++    switch(EVP_PKEY_base_id(pkey)) {
+ 	case EVP_PKEY_RSA:
+ 	    return IKEv2_AMT_RSA_DS;
+ 	case EVP_PKEY_DSA:
+@@ -696,13 +702,13 @@
+ 
+     uint8_t *cdata=cert->cdata;
+     uint32_t cdlen=cert->cdlen;
+-    x509 = d2i_X509( NULL, (unsigned char **)&cdata, cdlen );
++    x509 = d2i_X509( NULL, (const unsigned char **)&cdata, cdlen );
+     if( !x509 )
+ 	return 0;
+     csc = X509_STORE_CTX_new();
+     X509_STORE_CTX_init( csc, ctx, x509, NULL );
+     res = X509_verify_cert( csc );
+-    err = csc->error;
++    err = X509_STORE_CTX_get_error( csc );
+     //X509_STORE_CTX_cleanup( csc );
+     X509_STORE_CTX_free(csc);
+     if( err ) 
+@@ -720,14 +726,14 @@
+     xlogf(I2L_DBG,"EAP-IKEv2: Authenticate ...\n");
+     SHA1(adata,alen,md);
+     EVP_PKEY *public_key=X509_get_pubkey(x509);
+-    switch(EVP_PKEY_type(public_key->type)) {
++    switch(EVP_PKEY_base_id(public_key)) {
+ 	case EVP_PKEY_DSA:
+ 	    //TODO:check authtype!!!
+-	    res=DSA_verify(NID_sha1,md,SHA_DIGEST_LENGTH,sigbuf,siglen,public_key->pkey.dsa);
++	    res=DSA_verify(NID_sha1,md,SHA_DIGEST_LENGTH,sigbuf,siglen, EVP_PKEY_get0_DSA(public_key) );
+ 	    break;
+ 	case EVP_PKEY_RSA:
+ 	    //TODO:check authtype!!!
+-	    res=RSA_verify(NID_sha1,md,SHA_DIGEST_LENGTH,sigbuf,siglen,public_key->pkey.rsa);
++	    res=RSA_verify(NID_sha1,md,SHA_DIGEST_LENGTH,sigbuf,siglen, EVP_PKEY_get0_RSA(public_key));
+ 	    break;
+     }
+     if(res==-1) {
+diff -bur libeap-ikev2-0.2.1.orig/src/dh.c libeap-ikev2-0.2.1/src/dh.c
+--- libeap-ikev2-0.2.1.orig/src/dh.c	2006-09-16 01:26:08.000000000 +0200
++++ libeap-ikev2-0.2.1/src/dh.c	2018-10-24 11:43:19.885920814 +0200
+@@ -99,8 +99,7 @@
+   }
+   g = BN_bin2bn( &ig, sizeof( ig ), NULL );
+   if( p==NULL || g==NULL ) {DH_free(dh);return NULL;}
+-  dh->p = p;
+-  dh->g = g;
++  if(!DH_set0_pqg(dh, p, NULL, g)) {DH_free(dh); return NULL;}
+   if(!DH_generate_key( dh )) {DH_free(dh);return NULL;}
+ 
+   return dh;
+diff -bur libeap-ikev2-0.2.1.orig/src/encr.c libeap-ikev2-0.2.1/src/encr.c
+--- libeap-ikev2-0.2.1.orig/src/encr.c	2006-09-16 01:26:08.000000000 +0200
++++ libeap-ikev2-0.2.1/src/encr.c	2018-10-24 14:25:27.962486074 +0200
+@@ -142,16 +142,16 @@
+ {
+   iv=iv; // -Wunused  
+   uint32_t i;
+-  des_key_schedule k1, k2, k3;
+-  des_set_odd_parity( (des_cblock *)key );    // set parity, generate expanded keys
+-  des_key_sched( (des_cblock *)key, k1 );
+-  des_set_odd_parity( (des_cblock *)( key + 8 ) );
+-  des_key_sched( (des_cblock *)( key + 8 ), k2 );
+-  des_set_odd_parity( (des_cblock *)( key + 16 ) );
+-  des_key_sched( (des_cblock *)( key + 16 ), k3 );
++  DES_key_schedule k1, k2, k3;
++  DES_set_odd_parity( (DES_cblock *)key );    // set parity, generate expanded keys
++  DES_key_sched( (DES_cblock *)key, &k1 );
++  DES_set_odd_parity( (DES_cblock *)( key + 8 ) );
++  DES_key_sched( (DES_cblock *)( key + 8 ), &k2 );
++  DES_set_odd_parity( (DES_cblock *)( key + 16 ) );
++  DES_key_sched( (DES_cblock *)( key + 16 ), &k3 );
+   for( i = 0; i < dlen / 8; i++ )
+-    //des_ecb3_encrypt( (des_cblock *)( data + i * 8 ), (des_cblock *)( data + i * 8 ), k1, k2, k3, enc );
+-    des_ecb3_encrypt( (uint8_t *)( data + i * 8 ), (uint8_t *)( data + i * 8 ), k1, k2, k3, enc );
++    //DES_ecb3_encrypt( (DES_cblock *)( data + i * 8 ), (DES_cblock *)( data + i * 8 ), k1, k2, k3, enc );
++    DES_ecb3_encrypt( (data + i * 8 ), (uint8_t *)( data + i * 8 ), &k1, &k2, &k3, enc );
+ }
+ 
+ /**
+@@ -242,7 +242,7 @@
+ #endif
+     }
+     if(result) {
+-	if(result->flags & EVP_CIPH_VARIABLE_LENGTH) {
++	if( EVP_CIPHER_flags(result) & EVP_CIPH_VARIABLE_LENGTH) {
+ 	    xlogf(I2L_DBG,"EAP-IKEv2: variable key length cipher\n");
+ 	} else {
+ 	    xlogf(I2L_DBG,"EAP-IKEv2: constant key length cipher\n");
+@@ -267,7 +267,8 @@
+ {
+     assert(data && dlen && iv && key);
+     assert(enc==IKEv2_ENCRYPT || enc==IKEv2_DECRYPT);
+-    EVP_CIPHER_CTX ctx;
++    EVP_CIPHER_CTX *ctx;
++    ctx = EVP_CIPHER_CTX_new();
+     uint8_t *dpt;
+     int ol;
+     
+@@ -276,20 +277,20 @@
+     assert(!(keylen % 8 ));
+     if(enc==IKEv2_ENCRYPT) {
+ 	//EVP_EncryptInit(&ctx,cipher,key,iv);
+-	EVP_EncryptInit(&ctx,cipher,NULL,NULL);
+-	EVP_CIPHER_CTX_set_key_length(&ctx,keylen/8);
+-	EVP_EncryptInit(&ctx,NULL,key,iv);
++	EVP_EncryptInit(ctx,cipher,NULL,NULL);
++	EVP_CIPHER_CTX_set_key_length(ctx,keylen/8);
++	EVP_EncryptInit(ctx,NULL,key,iv);
+     } else {
+-	EVP_DecryptInit(&ctx,cipher,NULL,NULL);
+-	EVP_CIPHER_CTX_set_key_length(&ctx,keylen/8);
+-	EVP_DecryptInit(&ctx,NULL,key,iv);
++	EVP_DecryptInit(ctx,cipher,NULL,NULL);
++	EVP_CIPHER_CTX_set_key_length(ctx,keylen/8);
++	EVP_DecryptInit(ctx,NULL,key,iv);
+     }
+-    xlogf(I2L_DBG,"EAP-IKEv2: Key length:%d\n",EVP_CIPHER_CTX_key_length(&ctx)*8);
+-    EVP_CIPHER_CTX_set_padding(&ctx,0);
++    xlogf(I2L_DBG,"EAP-IKEv2: Key length:%d\n",EVP_CIPHER_CTX_key_length(ctx)*8);
++    EVP_CIPHER_CTX_set_padding(ctx,0);
+     if(enc==IKEv2_ENCRYPT) {
+-	EVP_EncryptUpdate(&ctx,dpt,&ol,data,dlen);
++	EVP_EncryptUpdate(ctx,dpt,&ol,data,dlen);
+     } else {
+-	EVP_DecryptUpdate(&ctx,dpt,&ol,data,dlen);
++	EVP_DecryptUpdate(ctx,dpt,&ol,data,dlen);
+     }
+     if(dlen!=(unsigned)ol) {
+ 	xlogf(I2L_ERR,"EAP-IKEv2: Something wrong with encryption\n");
+@@ -298,5 +299,5 @@
+     }
+     memcpy(data,dpt,dlen);
+     free(dpt);
+-    EVP_CIPHER_CTX_cleanup(&ctx);
++    EVP_CIPHER_CTX_cleanup(ctx);
+ }
+diff -bur libeap-ikev2-0.2.1.orig/src/hmac.c libeap-ikev2-0.2.1/src/hmac.c
+--- libeap-ikev2-0.2.1.orig/src/hmac.c	2006-09-16 01:26:08.000000000 +0200
++++ libeap-ikev2-0.2.1/src/hmac.c	2018-10-24 14:28:03.457307119 +0200
+@@ -213,15 +213,16 @@
+     assert(key && digest);
+     assert((msg!=NULL) == (mlen!=0));
+ 
+-    EVP_CIPHER_CTX ctx;
++    EVP_CIPHER_CTX *ctx;
++    ctx = EVP_CIPHER_CTX_new();
+     int ol;
+     uint8_t dpt[8];
+     uint8_t pad[8];
+     const uint8_t *data;
+     uint32_t i;
+     
+-    EVP_EncryptInit(&ctx,EVP_des_cbc(),key,NULL);
+-    EVP_CIPHER_CTX_set_padding(&ctx,0);
++    EVP_EncryptInit(ctx,EVP_des_cbc(),key,NULL);
++    EVP_CIPHER_CTX_set_padding(ctx,0);
+     if(msg && mlen) {
+ 	for(i=0;i<mlen;i+=8) {
+ 	    if(mlen%8 && (i>=mlen-8 || mlen<8)) {
+@@ -232,15 +233,15 @@
+ 	    } else {
+ 		data=msg+i;
+ 	    }
+-	    EVP_EncryptUpdate(&ctx,dpt,&ol,data,8);
++	    EVP_EncryptUpdate(ctx,dpt,&ol,data,8);
+ 	}
+     } else { 
+ 	// special case (null message)
+ 	memset(pad,0,8);
+-	EVP_EncryptUpdate(&ctx,dpt,&ol,pad,8);
++	EVP_EncryptUpdate(ctx,dpt,&ol,pad,8);
+     }
+     memcpy(digest,dpt,8);
+-    EVP_CIPHER_CTX_cleanup(&ctx);
++    EVP_CIPHER_CTX_free(ctx);
+     
+ }
+ 
+diff -bur libeap-ikev2-0.2.1.orig/src/payload.c libeap-ikev2-0.2.1/src/payload.c
+--- libeap-ikev2-0.2.1.orig/src/payload.c	2006-09-16 01:26:08.000000000 +0200
++++ libeap-ikev2-0.2.1/src/payload.c	2018-10-24 14:40:17.932442025 +0200
+@@ -175,11 +175,15 @@
+         return 0;
+   }
+   session->dh = dh;
+-  uint16_t modsize=BN_num_bytes(dh->p);
+-  uint16_t size=BN_num_bytes(dh->pub_key);
++  const BIGNUM *dh_p;
++  const BIGNUM *dh_pub_key;
++  DH_get0_pqg(dh, &dh_p, NULL, NULL);
++  DH_get0_key(dh, &dh_pub_key, NULL);
++  uint16_t modsize=BN_num_bytes(dh_p);
++  uint16_t size=BN_num_bytes(dh_pub_key);
+   assert(modsize-size>=0);
+   memset(p,0,modsize-size);
+-  BN_bn2bin(dh->pub_key,p+modsize-size);
++  BN_bn2bin(dh_pub_key,p+modsize-size);
+   p += modsize;
+   ke->Length = htons( p - (uint8_t *)ke );
+   return p - (uint8_t *)ke;

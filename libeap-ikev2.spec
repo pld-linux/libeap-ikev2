@@ -9,6 +9,7 @@ Source0:	http://downloads.sourceforge.net/eap-ikev2/%{name}-%{version}.tar.gz
 # Source0-md5:	e8c4900ff9f2825e189be66c61d146f2
 Patch0:		link.patch
 Patch1:		dont_redefine_bool.patch
+Patch2:		%{name}-openssl-1.1.0.patch
 URL:		http://eap-ikev2.sourceforge.net/
 BuildRequires:	autoconf
 BuildRequires:	automake
@@ -57,6 +58,7 @@ Statyczna biblioteka libeap-ikev2.
 %setup -q
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 %build
 %{__libtoolize}
