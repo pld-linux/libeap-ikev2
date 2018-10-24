@@ -216,7 +216,7 @@ diff -bur libeap-ikev2-0.2.1.orig/src/encr.c libeap-ikev2-0.2.1/src/encr.c
      memcpy(data,dpt,dlen);
      free(dpt);
 -    EVP_CIPHER_CTX_cleanup(&ctx);
-+    EVP_CIPHER_CTX_cleanup(ctx);
++    EVP_CIPHER_CTX_free(ctx);
  }
 diff -bur libeap-ikev2-0.2.1.orig/src/hmac.c libeap-ikev2-0.2.1/src/hmac.c
 --- libeap-ikev2-0.2.1.orig/src/hmac.c	2006-09-16 01:26:08.000000000 +0200
